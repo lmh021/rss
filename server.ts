@@ -720,157 +720,22 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
       const dateObj = new Date();
       const currentStampStr = dateObj.toLocaleDateString() + " " + dateObj.toLocaleTimeString();
 
-      if (!process.env.GEMINI_API_KEY) {
-        console.log("[Server] GEMINI_API_KEY not found. Performing dynamic YouTube matching and returning direct RSS parsed datasets.");
-        const directDigg = await Promise.all(liveMainStories.map((s, idx) => optimizeStoryYoutube(s, idx)));
-        const directCbs = await Promise.all(liveUsStories.map((s, idx) => optimizeStoryYoutube(s, idx)));
-        return res.json({
-          success: true,
-          source: "direct-rss-live",
-          cutoffDate: `Live RSS ${currentStampStr}`,
-          diggStories: directDigg,
-          cbsStories: directCbs,
-        });
-      }
-
-      console.log("[Server] Calling Gemini API (gemini-3.5-flash) to enrich RSS feed data...");
-      
-      // Lazy initialization of GoogleGenAI SDK
-      const ai = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        httpOptions: {
-          headers: {
-            "User-Agent": "aistudio-build",
-          },
-        },
-      });
-
-      const enrichmentPrompt = `
-        You are a highly premium live news curator, editor, and buyer's guide critic.
-        We have fetched real-time active feed entries from CBS News (Column 1) and Uncrate's buyer's guide (Column 2).
-        
-        Live Column 1 (CBS News Main/Global Headlines):
-        ${JSON.stringify(liveMainStories, null, 2)}
-        
-        Live Column 2 (Uncrate Gear & Style Buyer's Guide):
-        ${JSON.stringify(liveUsStories, null, 2)}
-        
-        For each story in BOTH lists, enrich it by:
-        1. Polishing the summary into a highly professional, 2-to-3 sentence presentation-ready brief. Keep it deeply informative. For Uncrate stories (Column 2), describe the product features, aesthetics, and craftsmanship elegantly.
-        2. For the video function, please use this prompt:
-           For each story,
-           1. Extract the main contextual keywords directly from the story.
-           2. Perform a YouTube search using those exact keywords (e.g., product/brand name for Uncrate).
-           3. Fetch the first search result and return its display title, video URL, and the image URL for its thumbnail.
-        3. Retain the exact original values for "id", "title", "url", and "publishedAt". Do not generate fake/different URLs.
-        4. Fill in or refine the "category" to one of our popular categories (Column 1: 'Politics', 'Finance', 'Space & Science', 'Climate & Environment', 'World News'; Column 2: 'Gear', 'Style', 'Cars', 'Shelter', 'Tech', 'Vices').
-        5. Assign a realistic views count (number between 50000 and 1500000) and a trending score (number between 65 and 99).
-        
-        Return the enriched lists STRICTLY as a raw JSON object matching the following structure. Do not prepended markdown block highlights. Just raw valid JSON.
-        
-        {
-          "diggStories": [
-            {
-              "id": "string",
-              "title": "string",
-              "summary": "string",
-              "url": "string",
-              "publishedAt": "string (ISO 8601 representation)",
-              "youtubeVideoId": "string (of the 11-char ID extracted from the search video URL if found)",
-              "youtubeVideoTitle": "string (display title of the first YouTube search result)",
-              "videoUrl": "string (the video URL of the first YouTube search result)",
-              "youtubeThumbnailUrl": "string (the image URL for the search result's thumbnail)",
-              "youtubeChannel": "string",
-              "viewsCount": number,
-              "trendingScore": number,
-              "category": "string"
-            }
-          ],
-          "cbsStories": [
-            {
-              "id": "string",
-              "title": "string",
-              "summary": "string",
-              "url": "string",
-              "publishedAt": "string (ISO 8601 representation)",
-              "youtubeVideoId": "string (of the 11-char ID extracted from the search video URL if found)",
-              "youtubeVideoTitle": "string (display title of the first YouTube search result)",
-              "videoUrl": "string (the video URL of the first YouTube search result)",
-              "youtubeThumbnailUrl": "string (the image URL for the search result's thumbnail)",
-              "youtubeChannel": "string",
-              "viewsCount": number,
-              "trendingScore": number,
-              "category": "string"
-            }
-          ]
-        }
-      `;
- 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: enrichmentPrompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          temperature: 0.2,
-        }
-      });
-
-      const rawText = response.text || "";
-      let parsedData;
-
-      try {
-        parsedData = JSON.parse(rawText.trim());
-      } catch (err) {
-        console.warn("[Server] Parsing Gemini JSON failed, looking for block markers:", err);
-        const match = rawText.match(/```(?:json)?([\s\S]+?)```/);
-        if (match) {
-          parsedData = JSON.parse(match[1].trim());
-        } else {
-          throw new Error("Unable to parse enriched JSON response format from Gemini");
-        }
-      }
-
-      const enrichedDigg = await Promise.all(
-        (parsedData.diggStories?.slice(0, 10) || liveMainStories).map((s: any, idx: number) => {
-          const originalStory = liveMainStories.find((o: any) => o.title?.toLowerCase() === s.title?.toLowerCase()) || liveMainStories[idx];
-          if (originalStory && originalStory.itemThumbnailUrl) {
-            s.itemThumbnailUrl = originalStory.itemThumbnailUrl;
-          }
-          return optimizeStoryYoutube(s, idx);
-        })
-      );
-      const enrichedCbs = await Promise.all(
-        (parsedData.cbsStories?.slice(0, 10) || liveUsStories).map((s: any, idx: number) => {
-          const originalStory = liveUsStories.find((o: any) => o.title?.toLowerCase() === s.title?.toLowerCase()) || liveUsStories[idx];
-          if (originalStory && originalStory.itemThumbnailUrl) {
-            s.itemThumbnailUrl = originalStory.itemThumbnailUrl;
-          }
-          return optimizeStoryYoutube(s, idx);
-        })
-      );
-
-      console.log("[Server] Gemini real-time RSS enrichment and dynamic YouTube lookup completed successfully.");
-      
-      return res.json({
-        success: true,
-        source: "gemini-grounded",
-        cutoffDate: `Real-time Grounded Feed`,
-        diggStories: enrichedDigg,
-        cbsStories: enrichedCbs,
-      });
-
-    } catch (apiError: any) {
-      console.error("[Server] Gemini enrichment failed. Serving raw parsing live RSS data with dynamic YouTube IDs:", apiError);
+      console.log("[Server] Dynamic YouTube matching on real-time RSS parsed datasets.");
       const directDigg = await Promise.all(liveMainStories.map((s, idx) => optimizeStoryYoutube(s, idx)));
       const directCbs = await Promise.all(liveUsStories.map((s, idx) => optimizeStoryYoutube(s, idx)));
+      
       return res.json({
         success: true,
         source: "direct-rss-live",
-        error: apiError.message || String(apiError),
-        cutoffDate: `Direct RSS Feed`,
+        cutoffDate: `Live RSS ${currentStampStr}`,
         diggStories: directDigg,
         cbsStories: directCbs,
+      });
+    } catch (apiError: any) {
+      console.error("[Server] Error servicing stories feed:", apiError);
+      return res.status(500).json({
+        success: false,
+        error: apiError.message || String(apiError)
       });
     }
   });
