@@ -12,7 +12,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "CBS Evening News",
     viewsCount: 890000,
     trendingScore: 99,
-    category: "Climate & Environment"
+    category: "Climate & Environment",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-2",
@@ -25,7 +26,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "CBS Mornings",
     viewsCount: 1250000,
     trendingScore: 98,
-    category: "Finance"
+    category: "Finance",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-3",
@@ -38,7 +40,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "60 Minutes",
     viewsCount: 2150000,
     trendingScore: 96,
-    category: "Space & Science"
+    category: "Space & Science",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-4",
@@ -51,7 +54,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "CBS News Reports",
     viewsCount: 460000,
     trendingScore: 94,
-    category: "World News"
+    category: "World News",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1504151932400-72d4384f04b3?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-5",
@@ -64,7 +68,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "CBS Evening News",
     viewsCount: 1680000,
     trendingScore: 92,
-    category: "Politics"
+    category: "Politics",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-6",
@@ -77,7 +82,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "CBS News",
     viewsCount: 380000,
     trendingScore: 89,
-    category: "Space & Science"
+    category: "Space & Science",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1507668077129-56e32842fceb?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-7",
@@ -90,7 +96,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "CBS Evening News",
     viewsCount: 620000,
     trendingScore: 88,
-    category: "Finance"
+    category: "Finance",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-8",
@@ -103,7 +110,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "60 Minutes",
     viewsCount: 740000,
     trendingScore: 87,
-    category: "Space & Science"
+    category: "Space & Science",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1530026405186-ed1ea0ac7a63?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-9",
@@ -116,7 +124,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "CBS News Reports",
     viewsCount: 970000,
     trendingScore: 85,
-    category: "Politics"
+    category: "Politics",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600&auto=format&fit=crop"
   },
   {
     id: "digg-10",
@@ -129,7 +138,8 @@ export const BACKUP_DIGG_STORIES: Story[] = [
     youtubeChannel: "CBS News Special Reports",
     viewsCount: 520000,
     trendingScore: 82,
-    category: "Climate & Environment"
+    category: "Climate & Environment",
+    itemThumbnailUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&auto=format&fit=crop"
   }
 ];
 

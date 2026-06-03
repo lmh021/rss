@@ -39,30 +39,87 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
 
   const numPrefix = String(index + 1).padStart(2, "0");
 
+  const isPlaceholderUrl = (url?: string) => {
+    if (!url) return true;
+    return url.includes("photo-1504711434969-e33886168f5c"); // corporate newspaper stock photo
+  };
+
+  const displayThumbnail = !isPlaceholderUrl(story.itemThumbnailUrl) 
+    ? story.itemThumbnailUrl 
+    : (story.youtubeThumbnailUrl || `https://img.youtube.com/vi/${story.youtubeVideoId}/mqdefault.jpg`);
+
+  const isLeftColumn = story.id.startsWith("digg");
+
   return (
     <div
       id={`story-card-${story.id}`}
       className="group relative flex flex-col justify-between overflow-hidden border border-[#1A1A1A] bg-white p-6 shadow-[3px_3px_0px_#1A1A1A] transition-all duration-300 hover:shadow-[5px_5px_0px_#1A1A1A] hover:-translate-y-0.5"
     >
-      {/* Decorative Index Label - Crimson Artistic flair style */}
-      <div className="absolute right-0 top-0 border-l border-b border-[#1A1A1A] bg-[#1A1A1A] text-[#F5F2ED] px-3.5 py-1.5 font-sans text-xs font-black tracking-widest">
-        #{numPrefix}
-      </div>
+      {isLeftColumn ? (
+        /* Left Column (News): High-fidelity, highly compact neat layout */
+        <div>
+          {/* Header meta line */}
+          <div className="flex items-center justify-between border-b border-[#1A1A1A]/10 pb-3 mb-4 w-full">
+            {story.category && (
+              <span className="bg-[#E63946] px-2.5 py-0.5 text-[10px] font-sans font-extrabold uppercase tracking-widest text-[#F5F2ED] shadow-[1.5px_1.5px_0px_#1A1A1A]">
+                {story.category}
+              </span>
+            )}
+            <span className="font-sans text-[10px] font-black text-[#1A1A1A] tracking-widest bg-[#EBE7E0] border border-[#1A1A1A] px-2 py-0.5">
+              INDEX #{numPrefix}
+            </span>
+          </div>
 
-      <div>
-        {/* Category badge & Publish time */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {/* Compact visual thumbnail right above the news headline */}
+          <div className="mb-3.5 relative w-36 h-22 overflow-hidden border border-[#1A1A1A] bg-[#1A1A1A] shadow-[2px_2px_0px_#1A1A1A]">
+            <img
+              src={displayThumbnail}
+              alt={story.title}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
+          {/* Publish time */}
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <span className="flex items-center gap-1.5 text-[10px] uppercase font-sans tracking-tight font-bold text-slate-500">
+              <Calendar className="h-3.5 w-3.5 text-[#E63946]" />
+              <span>{formatDate(story.publishedAt)} &bull; {formatTime(story.publishedAt)}</span>
+            </span>
+          </div>
+        </div>
+      ) : (
+        /* Right Column (Gear/Style): Expansive visual hero banner layout */
+        <div className="relative -mx-6 -mt-6 mb-5 aspect-[16/9] w-[calc(100%+3rem)] overflow-hidden border-b border-[#1A1A1A] bg-[#1A1A1A]">
+          <img
+            src={displayThumbnail}
+            alt={story.title}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            referrerPolicy="no-referrer"
+          />
           {story.category && (
-            <span className="bg-[#E63946] px-2.5 py-0.5 text-[10px] font-sans font-extrabold uppercase tracking-widest text-[#F5F2ED]">
+            <span className="absolute left-4 top-4 bg-[#E63946] px-2.5 py-0.5 text-[10px] font-sans font-extrabold uppercase tracking-widest text-[#F5F2ED] shadow-[2px_2px_0px_#1A1A1A]">
               {story.category}
             </span>
           )}
           
-          <span className="flex items-center gap-1.5 text-[10px] uppercase font-sans tracking-tight font-bold text-slate-500">
-            <Calendar className="h-3.5 w-3.5 text-[#E63946]" />
-            <span>{formatDate(story.publishedAt)} &bull; {formatTime(story.publishedAt)}</span>
-          </span>
+          {/* Decorative Index Label inside image header */}
+          <div className="absolute right-0 top-0 border-l border-b border-[#1A1A1A] bg-[#1A1A1A] text-[#F5F2ED] px-3.5 py-1.5 font-sans text-xs font-black tracking-widest">
+            #{numPrefix}
+          </div>
         </div>
+      )}
+
+      <div>
+        {!isLeftColumn && (
+          /* Publish time for Right Column (already embedded in header for Left Column) */
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <span className="flex items-center gap-1.5 text-[10px] uppercase font-sans tracking-tight font-bold text-slate-500">
+              <Calendar className="h-3.5 w-3.5 text-[#E63946]" />
+              <span>{formatDate(story.publishedAt)} &bull; {formatTime(story.publishedAt)}</span>
+            </span>
+          </div>
+        )}
 
         {/* Story Title - Playfair Serif design */}
         <h3 className="mb-3 font-serif text-lg font-black leading-tight text-[#1A1A1A] hover:text-[#E63946] transition-colors">
@@ -119,7 +176,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
           >
             {/* Thumbnail */}
             <img
-              src={story.itemThumbnailUrl || story.youtubeThumbnailUrl || `https://img.youtube.com/vi/${story.youtubeVideoId}/mqdefault.jpg`}
+              src={displayThumbnail}
               alt={story.title}
               className="absolute left-0 top-0 h-full w-full object-cover opacity-80 transition-transform duration-500 group-hover/video:scale-105"
               referrerPolicy="no-referrer"

@@ -280,6 +280,25 @@ async function startServer() {
       } else if (imgMatch) {
         itemThumbnailUrl = imgMatch[1];
       }
+
+      // Robust nested image-tag extraction fallback
+      if (!itemThumbnailUrl) {
+        const imageTagsMatch = itemXml.match(/<image[^>]*>([\s\S]*?)<\/image>/i);
+        if (imageTagsMatch) {
+          const innerUrlMatch = imageTagsMatch[1].match(/<url[^>]*>([\s\S]*?)<\/url>/i);
+          if (innerUrlMatch) {
+            itemThumbnailUrl = innerUrlMatch[1].trim();
+          }
+        }
+      }
+
+      // Bulletproof regex search for any direct product or news image URL inside the XML block
+      if (!itemThumbnailUrl) {
+        const anyImgUrlMatch = itemXml.match(/https?:\/\/[^"'\s<>]+?\.(?:jpe?g|png|gif|webp)(?:\?[^"'\s<>]+)?/i);
+        if (anyImgUrlMatch) {
+          itemThumbnailUrl = anyImgUrlMatch[0];
+        }
+      }
       
       if (itemThumbnailUrl) {
         itemThumbnailUrl = decodeXmlEntities(itemThumbnailUrl).replace(/['"]/g, "").trim();
@@ -621,11 +640,20 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
 
                 // Extract custom product thumbnail/image from the block
                 const thumbMatch = block.match(/style=["']background-image:\s*url\(([^)]+)\)["']/i) || 
-                                   block.match(/background-image:\s*url\(([^)]+)\)/i);
+                                   block.match(/background-image:\s*url\(([^)]+)\)/i) ||
+                                   block.match(/<img[^>]+src=["']([^"']+)["']/i);
                 let thumbUrl = "";
                 if (thumbMatch) {
                   thumbUrl = thumbMatch[1].replace(/['"]/g, "").trim();
                   thumbUrl = localDecodeXmlEntities(thumbUrl);
+                }
+
+                if (!thumbUrl) {
+                  // Direct product or article image absolute URL inside the block
+                  const inlineImgMatch = block.match(/https?:\/\/[^"'\s<>]+?\.(?:jpe?g|png|gif|webp)(?:\?[^"'\s<>]+)?/i);
+                  if (inlineImgMatch) {
+                    thumbUrl = inlineImgMatch[0];
+                  }
                 }
 
                 if (!thumbUrl) {
