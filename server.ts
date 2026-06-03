@@ -29,7 +29,9 @@ const extractYoutubeId = (urlOrId: string): string => {
 const checkYoutubeVideoExists = async (id: string): Promise<boolean> => {
   if (!id || id.length !== 11) return false;
   try {
-    const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`);
+    const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`, {
+      redirect: "manual"
+    });
     return res.status === 200;
   } catch (err) {
     return false;
@@ -54,11 +56,20 @@ const lookupYoutubeVideo = async (query: string): Promise<{ id: string; title: s
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanedQuery + " CBS News")}`;
     
     const res = await fetch(url, {
+      method: "GET",
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9"
-      }
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cookie": "CONSENT=YES+cb.20230531-04-p0.en+FX+909; SOCS=CAESEwgDEgk0ODE3Nzk3OTQaAmVuIAEaBgiA_LyaBg"
+      },
+      redirect: "manual" // Prevent the infinite Undici redirect loop on YouTube's consent wall
     });
+
+    if (res.status >= 300 && res.status < 400) {
+      // Gracefully handle the redirect without throwing error limit exceeded
+      return absoluteFallback;
+    }
 
     if (!res.ok) {
       return absoluteFallback;
@@ -93,8 +104,8 @@ const lookupYoutubeVideo = async (query: string): Promise<{ id: string; title: s
         url: `https://www.youtube.com/watch?v=${videoId}`
       };
     }
-  } catch (error) {
-    console.warn(`[Server] Dynamic YouTube lookup failed for query "${query}":`, error);
+  } catch (error: any) {
+    console.warn(`[Server] Dynamic YouTube lookup failed for query "${query}":`, error?.message || error);
   }
 
   return absoluteFallback;
