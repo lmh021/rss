@@ -107,7 +107,7 @@ const RssSuggestionEntry: React.FC<{ story: Story }> = ({ story }) => {
           <p className="font-sans text-[11px] uppercase tracking-wider text-slate-500 font-extrabold mt-1.5 flex items-center gap-2">
             <span className="text-[#E63946]">{story.category || "General News"}</span>
             <span>&bull;</span>
-            <span>Source: {story.id.startsWith("digg") ? "CBS Main" : "CBS US"}</span>
+            <span>Source: {story.id.startsWith("digg") ? "CBS Main" : "Uncrate"}</span>
           </p>
         </div>
 

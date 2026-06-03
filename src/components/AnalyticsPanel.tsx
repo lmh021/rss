@@ -26,7 +26,7 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
   // Combine all stories
   const allStories = useMemo(() => {
     const diggMapped = diggStories.map((s) => ({ ...s, source: "CBS Main News" }));
-    const cbsMapped = cbsStories.map((s) => ({ ...s, source: "CBS US News" }));
+    const cbsMapped = cbsStories.map((s) => ({ ...s, source: "Uncrate Gear & Style" }));
     return [...diggMapped, ...cbsMapped];
   }, [diggStories, cbsStories]);
 
@@ -99,7 +99,7 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
             <Newspaper className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-[10px] font-sans font-black tracking-widest text-slate-500 uppercase">CBS US News Aggregate Reach</p>
+            <p className="text-[10px] font-sans font-black tracking-widest text-slate-500 uppercase">Uncrate Gear Aggregate Reach</p>
             <h4 className="font-serif text-xl font-extrabold text-[#1A1A1A]">
               {stats.totalCbsViews.toLocaleString()}
             </h4>
@@ -125,7 +125,7 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
             <Eye className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-[10px] font-sans font-black tracking-widest text-slate-500 uppercase">CBS News Avg. Interest</p>
+            <p className="text-[10px] font-sans font-black tracking-widest text-slate-500 uppercase">Uncrate Avg. Gear Interest</p>
             <h4 className="font-serif text-xl font-extrabold text-[#1A1A1A]">
               {stats.avgCbsScore}% <span className="font-sans text-[10px] font-bold text-slate-400">power</span>
             </h4>
@@ -171,7 +171,7 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
                               : "bg-[#1A1A1A] text-white"
                           }`}
                         >
-                          {story.source === "CBS Main News" ? "CBS Main" : "CBS US News"}
+                          {story.source === "CBS Main News" ? "CBS Main" : "Uncrate Gear"}
                         </span>
                       </td>
                       <td className="max-w-[200px] truncate px-4 py-3 font-semibold text-[#1A1A1A]">
@@ -240,7 +240,7 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 bg-[#1A1A1A]"></span>
-                CBS US News Metrics
+                Uncrate Gear Metrics
               </span>
             </div>
           </div>

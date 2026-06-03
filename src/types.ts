@@ -12,6 +12,7 @@ export interface Story {
   category?: string; // Category for classification / charts
   videoUrl?: string; // Full video URL from search result
   youtubeThumbnailUrl?: string; // Thumbnail image URL from search result
+  itemThumbnailUrl?: string; // Original article/product thumbnail image URL
 }
 
 export interface DualFeedData {

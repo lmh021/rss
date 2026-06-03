@@ -107,7 +107,7 @@ export default function App() {
             </h1>
             
             <p className="font-sans text-[11px] text-[#1A1A1A]/70 uppercase tracking-widest font-bold">
-              cbsnews.com/latest/rss/main &bull;&nbsp;cbsnews.com/latest/rss/us &bull;&nbsp;Youtube Coverage
+              cbsnews.com/latest/rss/main &bull;&nbsp;uncrate.com/feed &bull;&nbsp;Youtube Coverage
             </p>
           </div>
 
@@ -149,7 +149,7 @@ export default function App() {
             {[
               { id: "all", label: "Dual Column Feed", icon: BookOpen },
               { id: "digg", label: "CBS News Main Only", icon: Sparkles },
-              { id: "cbs", label: "CBS News US Only", icon: Newspaper },
+              { id: "cbs", label: "Uncrate Gear Only", icon: Newspaper },
               { id: "analytics", label: "Analytics & Charts", icon: Activity }
             ].map((tab) => {
               const TabIcon = tab.icon;
@@ -273,7 +273,7 @@ export default function App() {
                     <div className="h-14 bg-white border border-[#1A1A1A] flex items-center justify-between px-6 text-[#1A1A1A] shadow-[2px_2px_0px_#1A1A1A]">
                       <h2 className="uppercase font-serif italic font-extrabold tracking-widest text-sm text-[#1A1A1A] flex items-center gap-2">
                         <span className="text-slate-400 font-sans font-black not-italic text-base">02.</span>
-                        CBS News / US Headliners
+                        Uncrate Gear & Style Buyers Guide
                       </h2>
                       <span className="font-sans text-[10px] font-black uppercase tracking-widest bg-[#1A1A1A] px-2 py-0.5 text-white">
                         LATEST DAILY FEED
@@ -285,7 +285,7 @@ export default function App() {
                         <StoryCard key={story.id} story={story} index={idx} />
                       ))}
                       {cbsFiltered.length === 0 && !searchTerm && (
-                        <p className="text-sm italic text-slate-400 font-serif">No CBS News US stories available.</p>
+                        <p className="text-sm italic text-slate-400 font-serif">No Uncrate stories available.</p>
                       )}
                     </div>
                   </div>
@@ -318,10 +318,10 @@ export default function App() {
                 <div className="space-y-6 max-w-3xl mx-auto">
                   <div className="h-14 bg-white border border-[#1A1A1A] flex items-center justify-between px-6 text-[#1A1A1A] shadow-[4px_4px_0_#1A1A1A]">
                     <h2 className="uppercase font-serif italic font-extrabold tracking-widest text-sm text-[#1A1A1A]">
-                      02. CBS News US Spotlight Feed (Top 10)
+                      02. Uncrate Gear Spotlight Feed (Top 10)
                     </h2>
                     <span className="font-sans text-[10px] font-black bg-[#1A1A1A] px-2.5 py-0.5 text-white uppercase">
-                      National Feed
+                      Gear & Style
                     </span>
                   </div>
 
@@ -370,7 +370,7 @@ export default function App() {
           </div>
 
           <div className="text-[9px] uppercase tracking-[0.25em] text-center opacity-50 block truncate max-w-md">
-            Source: CBSNews.com Main & US RSS &bull; YouTube Embed API
+            Source: CBSNews.com Main & Uncrate RSS &bull; YouTube Embed API
           </div>
 
           {/* Trigger Touch Targets: 44px min */}

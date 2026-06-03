@@ -119,9 +119,9 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
           >
             {/* Thumbnail */}
             <img
-              src={story.youtubeThumbnailUrl || `https://img.youtube.com/vi/${story.youtubeVideoId}/mqdefault.jpg`}
-              alt={story.youtubeVideoTitle}
-              className="absolute left-0 top-0 h-full w-full object-cover opacity-60 transition-transform duration-500 group-hover/video:scale-105"
+              src={story.itemThumbnailUrl || story.youtubeThumbnailUrl || `https://img.youtube.com/vi/${story.youtubeVideoId}/mqdefault.jpg`}
+              alt={story.title}
+              className="absolute left-0 top-0 h-full w-full object-cover opacity-80 transition-transform duration-500 group-hover/video:scale-105"
               referrerPolicy="no-referrer"
             />
             {/* Crimson overlay */}
@@ -131,10 +131,10 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E63946] text-white shadow-md transition-transform duration-300 group-hover/video:scale-110">
                 <Play className="ml-0.5 h-5 w-5 fill-auto" />
               </div>
-              <span className="text-[11px] font-sans font-bold text-white drop-shadow-sm line-clamp-1">
-                {story.youtubeVideoTitle}
+              <span className="text-[11px] font-sans font-bold text-white drop-shadow-sm line-clamp-1 bg-[#1A1A1A]/70 px-2 py-0.5 border border-white/10 rounded-sm">
+                Watch Media: {story.youtubeVideoTitle}
               </span>
-              <span className="text-[9px] font-sans font-semibold text-[#F5F2ED]/90 flex items-center gap-1 justify-center uppercase tracking-widest">
+              <span className="text-[9px] font-sans font-semibold text-[#F5F2ED]/90 flex items-center gap-1 justify-center uppercase tracking-widest bg-[#1A1A1A]/80 px-1.5 py-0.5 rounded-sm">
                 <Youtube className="h-3.5 w-3.5 text-[#E63946]" /> {story.youtubeChannel || "YouTube"}
               </span>
             </div>
