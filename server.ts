@@ -212,29 +212,46 @@ async function startServer() {
       
       // Extract title
       const titleMatch = itemXml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-      let title = titleMatch ? titleMatch[1].trim() : "CBS News Headline";
+      let title = titleMatch ? titleMatch[1].trim() : "Headline";
       title = title.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
       title = title.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
       title = decodeXmlEntities(title);
 
       // Extract link
-      const linkMatch = itemXml.match(/<link[^>]*>([\s\S]*?)<\/link>/i);
+      const linkMatch = itemXml.match(/<link[^>]*>([\s\S]*?)<\/link>/i) || itemXml.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i);
       let link = linkMatch ? linkMatch[1].trim() : "https://www.cbsnews.com";
       link = link.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
       link = decodeXmlEntities(link);
 
       // Extract description
+      const contentEncodedMatch = itemXml.match(/<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i);
       const descMatch = itemXml.match(/<description[^>]*>([\s\S]*?)<\/description>/i);
-      let summary = descMatch ? descMatch[1].trim() : "";
+      let summary = "";
+      if (contentEncodedMatch) {
+         summary = contentEncodedMatch[1].trim();
+      } else if (descMatch) {
+         summary = descMatch[1].trim();
+      }
       summary = summary.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
       summary = summary.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+
+      // Detect any inline image inside the summary BEFORE stripping HTML tags
+      let imgFromHtml = "";
+      const inlineImgMatch = summary.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (inlineImgMatch) {
+        imgFromHtml = inlineImgMatch[1].trim();
+      }
+
       summary = summary.replace(/<[^>]*>/g, "").trim(); // strip HTML tags
+      summary = summary.replace(/Visit\s+Uncrate\s+for\s+the\s+full\s+post\s*\.?/gi, "").trim();
       summary = decodeXmlEntities(summary);
       if (summary.length > 250) {
         summary = summary.slice(0, 247) + "...";
       }
       if (!summary) {
-        summary = "Access live coverage, videos, and multi-angle analysis directly from the cbsnews.com feed.";
+        summary = prefix === "digg" 
+          ? "Access live coverage, videos, and multi-angle analysis directly from the cbsnews.com feed."
+          : "Discover custom crafted high-performance gear, premium styles, classic luxury cars, and brutalist architectures curated by Uncrate.";
       }
 
       // Extract pubDate
@@ -262,6 +279,21 @@ async function startServer() {
       category = decodeXmlEntities(category);
       if (!category) {
         category = prefix === "digg" ? "Main News" : "Gear";
+      } else if (prefix === "cbs") { // Map Uncrate category
+        const lowerCat = category.toLowerCase();
+        if (lowerCat.includes("style") || lowerCat.includes("apparel") || lowerCat.includes("wear") || lowerCat.includes("shoes") || lowerCat.includes("boots") || lowerCat.includes("jacket") || lowerCat.includes("rings") || lowerCat.includes("watch") || lowerCat.includes("grooming")) {
+          category = "Style";
+        } else if (lowerCat.includes("car") || lowerCat.includes("automotive") || lowerCat.includes("motorcycle") || lowerCat.includes("vehicle") || lowerCat.includes("truck") || lowerCat.includes("rides") || lowerCat.includes("moto") || lowerCat.includes("ducati") || lowerCat.includes("yamaha") || lowerCat.includes("porsche")) {
+          category = "Cars";
+        } else if (lowerCat.includes("shelter") || lowerCat.includes("architecture") || lowerCat.includes("house") || lowerCat.includes("cabin") || lowerCat.includes("home") || lowerCat.includes("design") || lowerCat.includes("furniture") || lowerCat.includes("hotel")) {
+          category = "Shelter";
+        } else if (lowerCat.includes("tech") || lowerCat.includes("gadget") || lowerCat.includes("gear") || lowerCat.includes("tool") || lowerCat.includes("everyday carry") || lowerCat.includes("edc") || lowerCat.includes("audio") || lowerCat.includes("speaker") || lowerCat.includes("synth") || lowerCat.includes("software")) {
+          category = "Tech";
+        } else if (lowerCat.includes("vices") || lowerCat.includes("drink") || lowerCat.includes("smoke") || lowerCat.includes("whiskey") || lowerCat.includes("cigar") || lowerCat.includes("spirits") || lowerCat.includes("beer")) {
+          category = "Vices";
+        } else {
+          category = "Gear";
+        }
       }
 
       // Extract media thumbnail / content URL if present
@@ -271,14 +303,16 @@ async function startServer() {
       const enclosureMatch = itemXml.match(/<enclosure[^>]+url=["']([^"']+)["']/i);
       const imgMatch = itemXml.match(/<img[^>]+src=["']([^"']+)["']/i);
       
-      if (mediaContentMatch) {
-        itemThumbnailUrl = mediaContentMatch[1];
+      if (imgFromHtml) {
+        itemThumbnailUrl = imgFromHtml;
+      } else if (mediaContentMatch) {
+         itemThumbnailUrl = mediaContentMatch[1];
       } else if (mediaThumbnailMatch) {
-        itemThumbnailUrl = mediaThumbnailMatch[1];
+         itemThumbnailUrl = mediaThumbnailMatch[1];
       } else if (enclosureMatch) {
-        itemThumbnailUrl = enclosureMatch[1];
+         itemThumbnailUrl = enclosureMatch[1];
       } else if (imgMatch) {
-        itemThumbnailUrl = imgMatch[1];
+         itemThumbnailUrl = imgMatch[1];
       }
 
       // Robust nested image-tag extraction fallback
@@ -524,9 +558,13 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
       }
 
       try {
-        console.log("[Server] Crawling live feed from https://feeder.co/discover/dd31cbdbd7/uncrate-com");
-        const usRes = await fetch("https://feeder.co/discover/dd31cbdbd7/uncrate-com", {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36" }
+        console.log("[Server] Crawling live feed from https://feeds.feedburner.com/uncrate");
+        const usRes = await fetch("https://feeds.feedburner.com/uncrate", {
+          headers: { 
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/437.36",
+            "Accept": "application/rss+xml, application/xml, text/xml, */*",
+            "Cache-Control": "no-cache"
+          }
         });
         if (usRes.ok) {
           let usXml = await usRes.text();
