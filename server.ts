@@ -309,6 +309,25 @@ async function startServer() {
         ? verifyPoolDigg[(index - 1) % verifyPoolDigg.length]
         : verifyPoolCbs[(index - 1) % verifyPoolCbs.length];
 
+      if (!itemThumbnailUrl) {
+        const categoryPlaceholders: Record<string, string> = {
+          Cars: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&auto=format&fit=crop",
+          Gear: "https://images.unsplash.com/photo-1585366119957-e5733f3998cd?w=600&auto=format&fit=crop",
+          Tech: "https://images.unsplash.com/photo-1613521134141-f2d453aaad7d?w=600&auto=format&fit=crop",
+          Style: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&auto=format&fit=crop",
+          Shelter: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop",
+          Vices: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&auto=format&fit=crop",
+          Politics: "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=600&auto=format&fit=crop",
+          Finance: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&auto=format&fit=crop",
+          "Space & Science": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop",
+          "Climate & Environment": "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&auto=format&fit=crop",
+          "World News": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop",
+          "Main News": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&auto=format&fit=crop"
+        };
+        const activeCategory = category || (prefix === "digg" ? "Main News" : "Gear");
+        itemThumbnailUrl = categoryPlaceholders[activeCategory] || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&auto=format&fit=crop";
+      }
+
       stories.push({
         id: `${prefix}-${index}`,
         title,
@@ -321,7 +340,7 @@ async function startServer() {
         viewsCount,
         trendingScore,
         category,
-        itemThumbnailUrl: itemThumbnailUrl || undefined
+        itemThumbnailUrl
       });
       
       index++;
@@ -468,7 +487,12 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
       try {
         console.log("[Server] Crawling live feed from https://www.cbsnews.com/latest/rss/main");
         const mainRes = await fetch("https://www.cbsnews.com/latest/rss/main", {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) aistudio-build/1.0" }
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/rss+xml, application/xml, text/xml, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache"
+          }
         });
         if (mainRes.ok) {
           const mainXml = await mainRes.text();
@@ -780,10 +804,22 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
       }
 
       const enrichedDigg = await Promise.all(
-        (parsedData.diggStories?.slice(0, 10) || liveMainStories).map((s: any, idx: number) => optimizeStoryYoutube(s, idx))
+        (parsedData.diggStories?.slice(0, 10) || liveMainStories).map((s: any, idx: number) => {
+          const originalStory = liveMainStories.find((o: any) => o.title?.toLowerCase() === s.title?.toLowerCase()) || liveMainStories[idx];
+          if (originalStory && originalStory.itemThumbnailUrl) {
+            s.itemThumbnailUrl = originalStory.itemThumbnailUrl;
+          }
+          return optimizeStoryYoutube(s, idx);
+        })
       );
       const enrichedCbs = await Promise.all(
-        (parsedData.cbsStories?.slice(0, 10) || liveUsStories).map((s: any, idx: number) => optimizeStoryYoutube(s, idx))
+        (parsedData.cbsStories?.slice(0, 10) || liveUsStories).map((s: any, idx: number) => {
+          const originalStory = liveUsStories.find((o: any) => o.title?.toLowerCase() === s.title?.toLowerCase()) || liveUsStories[idx];
+          if (originalStory && originalStory.itemThumbnailUrl) {
+            s.itemThumbnailUrl = originalStory.itemThumbnailUrl;
+          }
+          return optimizeStoryYoutube(s, idx);
+        })
       );
 
       console.log("[Server] Gemini real-time RSS enrichment and dynamic YouTube lookup completed successfully.");
