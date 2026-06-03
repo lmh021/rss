@@ -18,8 +18,19 @@ import {
 } from "lucide-react";
 
 export default function App() {
-  const [data, setData] = useState<DualFeedData | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [data, setData] = useState<DualFeedData | null>(() => {
+    if (typeof window !== "undefined" && (window as any).__INITIAL_DATA__) {
+      console.log("[Client] Loading hydration state from __INITIAL_DATA__");
+      return (window as any).__INITIAL_DATA__;
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && (window as any).__INITIAL_DATA__) {
+      return false;
+    }
+    return true;
+  });
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Dynamically default to the current system date in ISO format
@@ -27,9 +38,19 @@ export default function App() {
     return today.toISOString().split("T")[0];
   });
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"all" | "digg" | "cbs" | "analytics">("all");
-  const [dataSource, setDataSource] = useState<string>("live");
-  const [isDemoFallback, setIsDemoFallback] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<"all" | "digg" | "cbs" | "analytics" >("all");
+  const [dataSource, setDataSource] = useState<string>(() => {
+    if (typeof window !== "undefined" && (window as any).__INITIAL_DATA_SOURCE__) {
+      return (window as any).__INITIAL_DATA_SOURCE__;
+    }
+    return "live";
+  });
+  const [isDemoFallback, setIsDemoFallback] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && (window as any).__INITIAL_DATA_FALLBACK__) {
+      return (window as any).__INITIAL_DATA_FALLBACK__;
+    }
+    return false;
+  });
 
   // Fetch stories data from local full-stack server
   const fetchStories = async (dateVal: string) => {
@@ -70,6 +91,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    // If the window has initial server pre-fetched live data, and the selected date is today's default, reuse it
+    if (typeof window !== "undefined" && (window as any).__INITIAL_DATA__) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      if (selectedDate === todayStr) {
+        console.log("[Client] Reusing pre-hydrated live dataset for query date:", selectedDate);
+        return;
+      }
+    }
     fetchStories(selectedDate);
   }, [selectedDate]);
 

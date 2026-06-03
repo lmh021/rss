@@ -528,14 +528,12 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
     }
   });
 
-  // API Route: Get latest trending stories with YouTube video search and metrics
-  app.get("/api/stories", async (req, res) => {
+  // Helper: Get latest trending stories with YouTube video search and metrics
+  const retrieveLatestStories = async (requestedDate: string): Promise<{ success: boolean; source: string; cutoffDate: string; diggStories: any[]; cbsStories: any[] }> => {
     let liveMainStories: any[] = [];
     let liveUsStories: any[] = [];
     try {
-      const requestedDate = (req.query.date as string) || "2026-06-01";
-
-      console.log(`[Server] Live RSS requested. Query Date requested is ${requestedDate}`);
+      console.log(`[Server] retrieveLatestStories invoked for date ${requestedDate}`);
 
       try {
         console.log("[Server] Crawling live feed from https://www.cbsnews.com/latest/rss/main");
@@ -761,16 +759,29 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
       console.log("[Server] Dynamic YouTube matching on real-time RSS parsed datasets.");
       const directDigg = await Promise.all(liveMainStories.map((s, idx) => optimizeStoryYoutube(s, idx)));
       const directCbs = await Promise.all(liveUsStories.map((s, idx) => optimizeStoryYoutube(s, idx)));
-      
-      return res.json({
+
+      return {
         success: true,
         source: "direct-rss-live",
         cutoffDate: `Live RSS ${currentStampStr}`,
         diggStories: directDigg,
         cbsStories: directCbs,
-      });
+      };
+    } catch (err: any) {
+      console.error("[Server] Error in retrieveLatestStories helper function:", err);
+      throw err;
+    }
+  };
+
+  // API Route: Get latest trending stories with YouTube video search and metrics
+  app.get("/api/stories", async (req, res) => {
+    try {
+      const requestedDate = (req.query.date as string) || "2026-06-01";
+      console.log(`[Server] Live RSS requested via /api/stories. Query Date: ${requestedDate}`);
+      const dataset = await retrieveLatestStories(requestedDate);
+      return res.json(dataset);
     } catch (apiError: any) {
-      console.error("[Server] Error servicing stories feed:", apiError);
+      console.error("[Server] Error servicing stories feed API:", apiError);
       return res.status(500).json({
         success: false,
         error: apiError.message || String(apiError)
@@ -782,7 +793,7 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
   if (process.env.NODE_ENV === "production") {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get("*", async (req, res) => {
       // 1. If it's a request to a missing API endpoint, return 404 JSON
       if (req.path.startsWith("/api/")) {
         return res.status(404).json({ error: "API route not found" });
@@ -794,8 +805,48 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
         return res.status(404).send("File not found");
       }
 
-      // 3. Otherwise serve index.html for virtual/client-side routes
-      res.sendFile(path.join(distPath, "index.html"));
+      // 3. Otherwise serve index.html with live-pre-fetched hydration state injected!
+      try {
+        const fs = await import("fs/promises");
+        const indexPath = path.join(distPath, "index.html");
+        let html = await fs.readFile(indexPath, "utf-8");
+
+        const todayStr = new Date().toISOString().split("T")[0];
+        console.log(`[Server] Pre-heating document request. Fetching live stories representation for: ${todayStr}`);
+        try {
+          const liveData = await retrieveLatestStories(todayStr);
+          const hydrationScript = `
+<script id="hydration-state">
+  window.__INITIAL_DATA__ = ${JSON.stringify(liveData)};
+  window.__INITIAL_DATA_SOURCE__ = ${JSON.stringify(liveData.source || "direct-rss-live")};
+  window.__INITIAL_DATA_FALLBACK__ = false;
+</script>
+`;
+          html = html.replace("<head>", `<head>${hydrationScript}`);
+          console.log("[Server] Successfully injected live feeds hydration state into production HTML.");
+        } catch (enrichErr) {
+          console.error("[Server] Error trying to pre-hydrate index.html. Falling back to default backup data hydration script:", enrichErr);
+          const fallbackSet = getDynamicFallback(todayStr);
+          const hydrationScript = `
+<script id="hydration-state">
+  window.__INITIAL_DATA__ = ${JSON.stringify({
+    success: true,
+    diggStories: fallbackSet.diggStories,
+    cbsStories: fallbackSet.cbsStories,
+    cutoffDate: "Static Archive Hydration Fallback"
+  })};
+  window.__INITIAL_DATA_SOURCE__ = "demo-fallback-injected";
+  window.__INITIAL_DATA_FALLBACK__ = true;
+</script>
+`;
+          html = html.replace("<head>", `<head>${hydrationScript}`);
+        }
+        
+        return res.send(html);
+      } catch (err: any) {
+        console.error("[Server] Failed serving index.html cleanly, using fallback sendFile:", err);
+        return res.sendFile(path.join(distPath, "index.html"));
+      }
     });
   } else {
     const vite = await createViteServer({
