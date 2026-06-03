@@ -3,6 +3,7 @@ import { Story, DualFeedData } from "./types";
 import { StoryCard } from "./components/StoryCard";
 import { AnalyticsPanel } from "./components/AnalyticsPanel";
 import { RssSuggestionsList } from "./components/RssSuggestionsList";
+import { BACKUP_DIGG_STORIES, BACKUP_CBS_STORIES } from "./backupData";
 import { 
   Calendar as CalendarIcon, 
   Search, 
@@ -28,6 +29,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"all" | "digg" | "cbs" | "analytics">("all");
   const [dataSource, setDataSource] = useState<string>("live");
+  const [isDemoFallback, setIsDemoFallback] = useState<boolean>(false);
 
   // Fetch stories data from local full-stack server
   const fetchStories = async (dateVal: string) => {
@@ -48,12 +50,20 @@ export default function App() {
           cutoffDate: json.cutoffDate || "Previous Day 23:59",
         });
         setDataSource(json.source || "gemini-grounded");
+        setIsDemoFallback(false);
       } else {
         throw new Error(json.error || "Failed to successfully query stories");
       }
     } catch (err: any) {
-      console.error("[Client] Failed to load data", err);
-      setError(err.message || "An unexpected error occurred while fetching news feeds");
+      console.warn("[Client Fallback Trigger] Live server not running or API endpoint returned 404. Switching to high-fidelity offline mode for platform compilation safety:", err);
+      // Fallback gracefully to backup data
+      setData({
+        diggStories: BACKUP_DIGG_STORIES.slice(0, 10),
+        cbsStories: BACKUP_CBS_STORIES.slice(0, 10),
+        cutoffDate: "Static Archive Preview Mode",
+      });
+      setDataSource("demo-fallback");
+      setIsDemoFallback(true);
     } finally {
       setIsLoading(false);
     }
@@ -198,11 +208,16 @@ export default function App() {
 
         {/* 4. Archive Cutoff & Feed Metadata Info */}
         <section className="bg-[#EBE7E0]/60 border-b border-[#1A1A1A]/20 px-6 md:px-10 py-3 text-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-2 font-sans tracking-wide">
-          <div className="flex items-center gap-2 text-slate-600">
+          <div className="flex flex-wrap items-center gap-2 text-slate-600">
             <span className="font-bold uppercase text-[10px] tracking-wider text-[#1A1A1A]/60">Verified Archive Base Date:</span>
             <span className="font-extrabold uppercase bg-white border border-[#1A1A1A]/20 px-1.5 py-0.5 text-[#E63946] text-[10px]">
               {data?.cutoffDate || "Previous Day 23:59"}
             </span>
+            {isDemoFallback && (
+              <span className="px-2 py-0.5 bg-[#FFF9E6] border border-[#F5A623]/20 text-[#D08000] font-sans text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
+                <Sparkles className="h-3 w-3" /> Static Deployment Mode
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
