@@ -816,6 +816,18 @@ You MUST use Google Search to find current, real, active URLs and titles. Ensure
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      // 1. If it's a request to a missing API endpoint, return 404 JSON
+      if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ error: "API route not found" });
+      }
+
+      // 2. If it's a request for a static asset/file that was not found by express.static, return a 404 Not Found
+      const hasExtension = path.extname(req.path) !== "";
+      if (hasExtension) {
+        return res.status(404).send("File not found");
+      }
+
+      // 3. Otherwise serve index.html for virtual/client-side routes
       res.sendFile(path.join(distPath, "index.html"));
     });
   } else {
