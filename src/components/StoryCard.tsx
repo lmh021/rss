@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Story } from "../types";
-import { ExternalLink, Youtube, Play, Target, Eye, Calendar } from "lucide-react";
+import { ExternalLink, Youtube, Play, Target, Eye, Calendar, Sparkles, Newspaper } from "lucide-react";
 
 interface StoryCardProps {
   story: Story;
@@ -9,6 +9,9 @@ interface StoryCardProps {
 
 export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [videoImgError, setVideoImgError] = useState(false);
+  const [miniImgError, setMiniImgError] = useState(false);
 
   // Formatting published date
   const formatTime = (isoString: string) => {
@@ -71,13 +74,21 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
           </div>
 
           {/* Compact visual thumbnail right above the news headline */}
-          <div className="mb-3.5 relative w-36 h-22 overflow-hidden border border-[#1A1A1A] bg-[#1A1A1A] shadow-[2px_2px_0px_#1A1A1A]">
-            <img
-              src={displayThumbnail}
-              alt={story.title}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              referrerPolicy="no-referrer"
-            />
+          <div className="mb-3.5 relative w-36 h-22 overflow-hidden border border-[#1A1A1A] bg-[#1A1A1A] shadow-[2px_2px_0px_#1A1A1A] flex items-center justify-center p-2 text-center text-[10px] font-mono select-none">
+            {!imgError ? (
+              <img
+                src={displayThumbnail}
+                alt={story.title}
+                onError={() => setImgError(true)}
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-1 text-slate-400">
+                <Newspaper className="h-4 w-4 text-[#E63946]" />
+                <span className="text-[8px] uppercase font-sans tracking-tight font-black">{story.category || "News"}</span>
+              </div>
+            )}
           </div>
 
           {/* Publish time */}
@@ -90,13 +101,22 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
         </div>
       ) : (
         /* Right Column (Gear/Style): Expansive visual hero banner layout */
-        <div className="relative -mx-6 -mt-6 mb-5 aspect-[16/9] w-[calc(100%+3rem)] overflow-hidden border-b border-[#1A1A1A] bg-[#1A1A1A]">
-          <img
-            src={displayThumbnail}
-            alt={story.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            referrerPolicy="no-referrer"
-          />
+        <div className="relative -mx-6 -mt-6 mb-5 aspect-[16/9] w-[calc(100%+3rem)] overflow-hidden border-b border-[#1A1A1A] bg-[#1A1A1A] flex items-center justify-center">
+          {!imgError ? (
+            <img
+              src={displayThumbnail}
+              alt={story.title}
+              onError={() => setImgError(true)}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 p-4 text-center max-w-xs text-[#F5F2ED]">
+              <Sparkles className="h-6 w-6 text-[#E63946]" />
+              <span className="text-xs font-sans font-black uppercase tracking-widest">{story.category || "Gear & Style"}</span>
+              <span className="text-[10px] font-serif italic opacity-80 line-clamp-2">{story.title}</span>
+            </div>
+          )}
           {story.category && (
             <span className="absolute left-4 top-4 bg-[#E63946] px-2.5 py-0.5 text-[10px] font-sans font-extrabold uppercase tracking-widest text-[#F5F2ED] shadow-[2px_2px_0px_#1A1A1A]">
               {story.category}
@@ -122,7 +142,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
         )}
 
         {/* Story Title - Playfair Serif design */}
-        <h3 className="mb-3 font-serif text-lg font-black leading-tight text-[#1A1A1A] hover:text-[#E63946] transition-colors">
+        <h3 className="mb-3 font-serif text-lg font-black leading-tight text-[#1A1A1A] hover:text-[#E63946] transition-colors font-bold">
           <a href={story.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2">
             {story.title}
           </a>
@@ -175,16 +195,24 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
             title="Click to stream YouTube coverage"
           >
             {/* Thumbnail */}
-            <img
-              src={displayThumbnail}
-              alt={story.title}
-              className="absolute left-0 top-0 h-full w-full object-cover opacity-80 transition-transform duration-500 group-hover/video:scale-105"
-              referrerPolicy="no-referrer"
-            />
+            {!videoImgError ? (
+              <img
+                src={displayThumbnail}
+                alt={story.title}
+                onError={() => setVideoImgError(true)}
+                className="absolute left-0 top-0 h-full w-full object-cover opacity-80 transition-transform duration-500 group-hover/video:scale-105"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-[#1A1A1A] via-slate-800 to-[#1A1A1A] flex flex-col items-center justify-center p-4">
+                <Youtube className="h-8 w-8 text-[#E63946]" />
+                <span className="text-[9px] font-sans font-black uppercase tracking-widest text-slate-400 mt-1">Live Segment Stream</span>
+              </div>
+            )}
             {/* Crimson overlay */}
             <div className="absolute inset-0 bg-[#E63946]/10 transition-colors duration-300 group-hover/video:bg-slate-900/60" />
 
-            <div className="relative z-10 flex flex-col items-center gap-2 p-3 text-center">
+            <div className="relative z-10 flex flex-col items-center gap-2 p-3 text-center w-full">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E63946] text-white shadow-md transition-transform duration-300 group-hover/video:scale-110">
                 <Play className="ml-0.5 h-5 w-5 fill-auto" />
               </div>
@@ -204,13 +232,13 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
             // MATCHED YOUTUBE OBJECT DETAILS
           </div>
           <div className="leading-snug">
-            <span className="font-extrabold text-slate-600">- **Video Title:**</span> {story.youtubeVideoTitle || "[Insert Title]"}
+            <span className="font-bold text-slate-600">- **Video Title:**</span> {story.youtubeVideoTitle || "[Insert Title]"}
           </div>
           <div className="leading-snug">
-            <span className="font-extrabold text-slate-600">- **Source Channel:**</span> {story.youtubeChannel || "[Insert Channel]"}
+            <span className="font-bold text-slate-600">- **Source Channel:**</span> {story.youtubeChannel || "[Insert Channel]"}
           </div>
           <div className="leading-snug flex flex-wrap gap-1">
-            <span className="font-extrabold text-slate-600">- **Watch Link:**</span> 
+            <span className="font-bold text-slate-600">- **Watch Link:**</span> 
             <a 
               href={story.videoUrl || `https://www.youtube.com/watch?v=${story.youtubeVideoId}`} 
               target="_blank" 
@@ -221,14 +249,19 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, index }) => {
             </a>
           </div>
           <div className="flex items-center gap-2 pt-1">
-            <span className="font-extrabold text-slate-600">- **Visual Preview:**</span>
-            <div className="relative h-10 w-16 overflow-hidden border border-[#1A1A1A] bg-slate-100 rounded-sm">
-              <img 
-                src={story.youtubeThumbnailUrl || `https://img.youtube.com/vi/${story.youtubeVideoId}/mqdefault.jpg`} 
-                alt="Thumbnail" 
-                className="h-full w-full object-cover" 
-                referrerPolicy="no-referrer"
-              />
+            <span className="font-bold text-slate-600">- **Visual Preview:**</span>
+            <div className="relative h-10 w-16 overflow-hidden border border-[#1A1A1A] bg-[#1A1A1A] rounded-sm flex items-center justify-center font-bold text-white text-[8px]">
+              {!miniImgError ? (
+                <img 
+                  src={story.youtubeThumbnailUrl || `https://img.youtube.com/vi/${story.youtubeVideoId}/mqdefault.jpg`} 
+                  alt="Thumbnail" 
+                  onError={() => setMiniImgError(true)}
+                  className="h-full w-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <Youtube className="h-4 w-4 text-[#E63946]" />
+              )}
             </div>
           </div>
         </div>

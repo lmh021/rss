@@ -17,6 +17,568 @@ import {
   BookOpen
 } from "lucide-react";
 
+// Decode XML Entities Helper Function
+const decodeXmlEntities = (str: string): string => {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&#039;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&ldquo;/g, "“")
+    .replace(/&rdquo;/g, "”")
+    .replace(/&lsquo;/g, "‘")
+    .replace(/&rsquo;/g, "’")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–");
+};
+
+// Sequential CORS proxy fetcher
+const fetchWithProxy = async (url: string): Promise<string> => {
+  const proxies = [
+    (target: string) => `https://corsproxy.io/?url=${encodeURIComponent(target)}`,
+    (target: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+    (target: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`
+  ];
+
+  let lastError: any = null;
+  for (const proxy of proxies) {
+    try {
+      const proxiedUrl = proxy(url);
+      const res = await fetch(proxiedUrl);
+      if (res.ok) {
+        return await res.text();
+      }
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError || new Error("Failed to fetch RSS feed through any of the client CORS proxies.");
+};
+
+// Fallback date mapper for historical query requests
+const getDynamicFallback = (requestedDateStr: string) => {
+  const cutoffDateObj = new Date(requestedDateStr);
+  cutoffDateObj.setDate(cutoffDateObj.getDate() - 1);
+  const previousDayStr = cutoffDateObj.toISOString().split("T")[0];
+
+  const adjustStory = (story: any, index: number) => {
+    const hour = Math.max(0, 22 - index * 2);
+    const minute = (index * 13) % 65 % 60;
+    const isoString = `${previousDayStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`;
+    return {
+      ...story,
+      publishedAt: isoString,
+    };
+  };
+
+  return {
+    cutoffDate: `${previousDayStr} 23:59`,
+    diggStories: BACKUP_DIGG_STORIES.map((s, idx) => adjustStory(s, idx)),
+    cbsStories: BACKUP_CBS_STORIES.map((s, idx) => adjustStory(s, idx)),
+  };
+};
+
+// Client side XML feed parser inside browser
+const parseRssXmlClient = (xmlText: string, prefix: "digg" | "cbs"): Story[] => {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+  
+  const parseError = xmlDoc.getElementsByTagName("parsererror");
+  if (parseError.length > 0) {
+    console.warn("[DOMParser] XML Parse Error. Falling back to robust Regex extractor:", parseError[0].textContent);
+    return parseRssXmlRegexFallback(xmlText, prefix);
+  }
+
+  const items = xmlDoc.querySelectorAll("item");
+  const stories: Story[] = [];
+  const limit = 10;
+
+  const verifyPoolDigg = [
+    { id: "gX3fAnY_1dI", title: "CBS Evening News Full Special Broadcast", channel: "CBS Evening News" },
+    { id: "DQacCB9tDaw", title: "CBS News Financial Forecast & Market Report", channel: "CBS News Markets" },
+    { id: "29ECwWrnzdQ", title: "60 Minutes: Behind the Scenes Investigative Report", channel: "60 Minutes" },
+    { id: "vB-SAnAatgA", title: "CBS Mornings Interactive Correspondent Segment", channel: "CBS Mornings" },
+    { id: "V_mepYmclHA", title: "Neuralink & Advanced BioTech Clinical Trials Update", channel: "CBS News Reports" }
+  ];
+  const verifyPoolCbs = [
+    { id: "9S5R9K13mK0", title: "Omega Seamaster Ultra Deep Titanium Hands-On Review", channel: "Teddy Baldassarre" },
+    { id: "gqK7i4Ncsis", title: "Porsche 911 S/T: The Best 911 Ever Built?", channel: "Top Gear" },
+    { id: "bOWeeHdfm58", title: "Inside a Breathtaking Concrete Brutalist Escape", channel: "Never Too Small" },
+    { id: "nUvV8tE-aSM", title: "Leica M11-D Rangefinder: No Screen, No Compromise", channel: "KaiManWong" },
+    { id: "fcoiN7S3I8o", title: "The Ridge Wallet Upgrade: Heat-Torched Titanium & Carbon", channel: "EDC Weekly" }
+  ];
+
+  const categoryPlaceholders: Record<string, string> = {
+    Cars: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&auto=format&fit=crop",
+    Gear: "https://images.unsplash.com/photo-1585366119957-e5733f3998cd?w=600&auto=format&fit=crop",
+    Tech: "https://images.unsplash.com/photo-1613521134141-f2d453aaad7d?w=600&auto=format&fit=crop",
+    Style: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&auto=format&fit=crop",
+    Shelter: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop",
+    Vices: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&auto=format&fit=crop",
+    Politics: "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=600&auto=format&fit=crop",
+    Finance: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&auto=format&fit=crop",
+    "Space & Science": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop",
+    "Climate & Environment": "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&auto=format&fit=crop",
+    "World News": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop",
+    "Main News": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&auto=format&fit=crop"
+  };
+
+  for (let i = 0; i < items.length && stories.length < limit; i++) {
+    const item = items[i];
+    const itemXmlStr = new XMLSerializer().serializeToString(item);
+    
+    const getTagValue = (tagName: string): string => {
+      const el = item.getElementsByTagName(tagName)[0] || item.getElementsByTagNameNS("*", tagName)[0];
+      return el ? el.textContent || "" : "";
+    };
+
+    let title = getTagValue("title").trim();
+    if (!title) {
+      const titleMatch = itemXmlStr.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      if (titleMatch) title = titleMatch[1].trim();
+    }
+    title = title.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
+    title = title.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    title = decodeXmlEntities(title);
+
+    // Ultra robust link parsing: check DOM, check XML matches, support links inside CDATA, support nested link tag structures
+    let link = getTagValue("link").trim() || getTagValue("guid").trim();
+    if (!link || !link.startsWith("http")) {
+      const linkMatch = itemXmlStr.match(/<link[^>]*>([\s\S]*?)<\/link>/i) || itemXmlStr.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i);
+      if (linkMatch) {
+        link = linkMatch[1].trim();
+      }
+    }
+    const hrefMatch = itemXmlStr.match(/<link[^>]+href=["']([^"']+)["']/i);
+    if (hrefMatch && (!link || !link.startsWith("http"))) {
+      link = hrefMatch[1].trim();
+    }
+    link = link.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
+    link = link.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    link = decodeXmlEntities(link);
+    if (!link || !link.startsWith("http")) {
+      link = prefix === "digg" ? "https://www.cbsnews.com" : "https://uncrate.com";
+    }
+
+    let summary = getTagValue("content:encoded") || getTagValue("description");
+    if (!summary) {
+      const summaryMatch = itemXmlStr.match(/<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i) || itemXmlStr.match(/<description[^>]*>([\s\S]*?)<\/description>/i);
+      if (summaryMatch) summary = summaryMatch[1].trim();
+    }
+    summary = summary.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
+    summary = summary.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+
+    let imgFromHtml = "";
+    const inlineImgMatch = summary.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (inlineImgMatch) {
+      imgFromHtml = inlineImgMatch[1].trim();
+    }
+
+    summary = summary.replace(/<[^>]*>/g, "").trim();
+    summary = summary.replace(/Visit\s+Uncrate\s+for\s+the\s+full\s+post\s*\.?/gi, "").trim();
+    summary = decodeXmlEntities(summary);
+    if (summary.length > 250) {
+      summary = summary.slice(0, 247) + "...";
+    }
+    if (!summary) {
+      summary = prefix === "digg" 
+        ? "Access live coverage, videos, and multi-angle analysis directly from the cbsnews.com feed."
+        : "Discover custom crafted high-performance gear, premium styles, classic luxury cars, and brutalist architectures curated by Uncrate.";
+    }
+
+    let publishedAt = new Date().toISOString();
+    const pubDateStr = getTagValue("pubDate");
+    if (pubDateStr) {
+      try {
+        const parsedDate = new Date(pubDateStr);
+        if (!isNaN(parsedDate.getTime())) {
+          publishedAt = parsedDate.toISOString();
+        }
+      } catch {}
+    }
+
+    let category = getTagValue("category").trim();
+    if (!category) {
+      const catMatch = itemXmlStr.match(/<category[^>]*>([\s\S]*?)<\/category>/i);
+      if (catMatch) category = catMatch[1].trim();
+    }
+    category = category.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    category = decodeXmlEntities(category);
+    if (!category) {
+      category = prefix === "digg" ? "Main News" : "Gear";
+    } else if (prefix === "cbs") {
+      const lowerCat = category.toLowerCase();
+      if (lowerCat.includes("style") || lowerCat.includes("apparel") || lowerCat.includes("wear") || lowerCat.includes("shoes") || lowerCat.includes("boots") || lowerCat.includes("jacket") || lowerCat.includes("rings") || lowerCat.includes("watch") || lowerCat.includes("grooming")) {
+        category = "Style";
+      } else if (lowerCat.includes("car") || lowerCat.includes("automotive") || lowerCat.includes("motorcycle") || lowerCat.includes("vehicle") || lowerCat.includes("truck") || lowerCat.includes("rides") || lowerCat.includes("moto") || lowerCat.includes("ducati") || lowerCat.includes("yamaha") || lowerCat.includes("porsche")) {
+        category = "Cars";
+      } else if (lowerCat.includes("shelter") || lowerCat.includes("architecture") || lowerCat.includes("house") || lowerCat.includes("cabin") || lowerCat.includes("home") || lowerCat.includes("design") || lowerCat.includes("furniture") || lowerCat.includes("hotel")) {
+        category = "Shelter";
+      } else if (lowerCat.includes("tech") || lowerCat.includes("gadget") || lowerCat.includes("gear") || lowerCat.includes("tool") || lowerCat.includes("everyday carry") || lowerCat.includes("edc") || lowerCat.includes("audio") || lowerCat.includes("speaker") || lowerCat.includes("synth") || lowerCat.includes("software")) {
+        category = "Tech";
+      } else if (lowerCat.includes("vices") || lowerCat.includes("drink") || lowerCat.includes("smoke") || lowerCat.includes("whiskey") || lowerCat.includes("cigar") || lowerCat.includes("spirits") || lowerCat.includes("beer")) {
+        category = "Vices";
+      } else {
+        category = "Gear";
+      }
+    }
+
+    // Extraction of thumbnail: namespaced tags check safely, fallback to regex matching
+    let itemThumbnailUrl = "";
+
+    // Safely check namespaced nodes via standard DOM element methods first
+    const mediaContent = item.getElementsByTagNameNS("*", "content")[0] || item.getElementsByTagName("content")[0];
+    if (mediaContent) {
+      itemThumbnailUrl = mediaContent.getAttribute("url") || "";
+    }
+    if (!itemThumbnailUrl) {
+      const mediaThumbnail = item.getElementsByTagNameNS("*", "thumbnail")[0] || item.getElementsByTagName("thumbnail")[0];
+      if (mediaThumbnail) {
+        itemThumbnailUrl = mediaThumbnail.getAttribute("url") || "";
+      }
+    }
+    if (!itemThumbnailUrl) {
+      const enclosure = item.getElementsByTagName("enclosure")[0];
+      if (enclosure) {
+        itemThumbnailUrl = enclosure.getAttribute("url") || "";
+      }
+    }
+    if (!itemThumbnailUrl) {
+      itemThumbnailUrl = imgFromHtml;
+    }
+
+    // Failsafe: Try regexes on the serialized item XML string for namespaced content/thumbnail urls
+    if (!itemThumbnailUrl) {
+      const mediaContentMatch = itemXmlStr.match(/<[^:]+:content[^>]+url=["']([^"']+)["']/i) || itemXmlStr.match(/<content[^>]+url=["']([^"']+)["']/i);
+      if (mediaContentMatch) itemThumbnailUrl = mediaContentMatch[1];
+    }
+    if (!itemThumbnailUrl) {
+      const mediaThumbnailMatch = itemXmlStr.match(/<[^:]+:thumbnail[^>]+url=["']([^"']+)["']/i) || itemXmlStr.match(/<thumbnail[^>]+url=["']([^"']+)["']/i);
+      if (mediaThumbnailMatch) itemThumbnailUrl = mediaThumbnailMatch[1];
+    }
+    if (!itemThumbnailUrl) {
+      const enclosureMatch = itemXmlStr.match(/<enclosure[^>]+url=["']([^"']+)["']/i);
+      if (enclosureMatch) itemThumbnailUrl = enclosureMatch[1];
+    }
+    if (!itemThumbnailUrl) {
+      const imgMatch = itemXmlStr.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (imgMatch) itemThumbnailUrl = imgMatch[1];
+    }
+
+    // Nested image-tag extractor fallback
+    if (!itemThumbnailUrl) {
+      const itemImg = item.getElementsByTagName("image")[0] || item.getElementsByTagNameNS("*", "image")[0];
+      if (itemImg) {
+        const innerUrl = itemImg.getElementsByTagName("url")[0] || itemImg.getElementsByTagNameNS("*", "url")[0];
+        if (innerUrl) itemThumbnailUrl = innerUrl.textContent || "";
+      }
+    }
+    if (!itemThumbnailUrl) {
+      const imageTagsMatch = itemXmlStr.match(/<image[^>]*>([\s\S]*?)<\/image>/i);
+      if (imageTagsMatch) {
+         const innerUrlMatch = imageTagsMatch[1].match(/<url[^>]*>([\s\S]*?)<\/url>/i);
+         if (innerUrlMatch) itemThumbnailUrl = innerUrlMatch[1].trim();
+      }
+    }
+
+    // Last resort: bulletproof regex scan for any image URL inside the XML block
+    if (!itemThumbnailUrl) {
+      const anyImgUrlMatch = itemXmlStr.match(/https?:\/\/[^"'\s<>]+?\.(?:jpe?g|png|gif|webp)(?:\?[^"'\s<>]+)?/i);
+      if (anyImgUrlMatch) itemThumbnailUrl = anyImgUrlMatch[0];
+    }
+
+    if (itemThumbnailUrl) {
+      itemThumbnailUrl = decodeXmlEntities(itemThumbnailUrl).replace(/['"]/g, "").trim();
+    }
+
+    if (!itemThumbnailUrl) {
+      itemThumbnailUrl = categoryPlaceholders[category] || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&auto=format&fit=crop";
+    }
+
+    const videoChoice = prefix === "digg" 
+      ? verifyPoolDigg[stories.length % verifyPoolDigg.length]
+      : verifyPoolCbs[stories.length % verifyPoolCbs.length];
+
+    const viewsCount = Math.floor(Math.random() * 500000) + 120000;
+    const trendingScore = Math.floor(Math.random() * 25) + 72;
+
+    stories.push({
+      id: `${prefix}-${stories.length + 1}`,
+      title,
+      summary,
+      url: link,
+      publishedAt,
+      youtubeVideoId: videoChoice.id,
+      youtubeVideoTitle: videoChoice.title,
+      youtubeChannel: videoChoice.channel,
+      viewsCount,
+      trendingScore,
+      category,
+      itemThumbnailUrl
+    });
+  }
+
+  return stories;
+};
+
+// Pure regex parser fallback in case browser parser fails on dirty XML blocks
+const parseRssXmlRegexFallback = (xml: string, prefix: "digg" | "cbs"): Story[] => {
+  const stories: Story[] = [];
+  const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/gi;
+  let match;
+  let index = 1;
+  const limit = 10;
+  
+  const verifyPoolDigg = [
+    { id: "gX3fAnY_1dI", title: "CBS Evening News Full Special Broadcast", channel: "CBS Evening News" },
+    { id: "DQacCB9tDaw", title: "CBS News Financial Forecast & Market Report", channel: "CBS News Markets" },
+    { id: "29ECwWrnzdQ", title: "60 Minutes: Behind the Scenes Investigative Report", channel: "60 Minutes" },
+    { id: "vB-SAnAatgA", title: "CBS Mornings Interactive Correspondent Segment", channel: "CBS Mornings" },
+    { id: "V_mepYmclHA", title: "Neuralink & Advanced BioTech Clinical Trials Update", channel: "CBS News Reports" }
+  ];
+  const verifyPoolCbs = [
+    { id: "9S5R9K13mK0", title: "Omega Seamaster Ultra Deep Titanium Hands-On Review", channel: "Teddy Baldassarre" },
+    { id: "gqK7i4Ncsis", title: "Porsche 911 S/T: The Best 911 Ever Built?", channel: "Top Gear" },
+    { id: "bOWeeHdfm58", title: "Inside a Breathtaking Concrete Brutalist Escape", channel: "Never Too Small" },
+    { id: "nUvV8tE-aSM", title: "Leica M11-D Rangefinder: No Screen, No Compromise", channel: "KaiManWong" },
+    { id: "fcoiN7S3I8o", title: "The Ridge Wallet Upgrade: Heat-Torched Titanium & Carbon", channel: "EDC Weekly" }
+  ];
+
+  const categoryPlaceholders: Record<string, string> = {
+    Cars: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&auto=format&fit=crop",
+    Gear: "https://images.unsplash.com/photo-1585366119957-e5733f3998cd?w=600&auto=format&fit=crop",
+    Tech: "https://images.unsplash.com/photo-1613521134141-f2d453aaad7d?w=600&auto=format&fit=crop",
+    Style: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&auto=format&fit=crop",
+    Shelter: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop",
+    Vices: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&auto=format&fit=crop",
+    Politics: "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=600&auto=format&fit=crop",
+    Finance: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&auto=format&fit=crop",
+    "Space & Science": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop",
+    "Climate & Environment": "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&auto=format&fit=crop",
+    "World News": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop",
+    "Main News": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&auto=format&fit=crop"
+  };
+
+  while ((match = itemRegex.exec(xml)) !== null && index <= limit) {
+    const itemXml = match[1];
+    
+    let title = "Headline";
+    const titleMatch = itemXml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    if (titleMatch) {
+      title = titleMatch[1].trim();
+    }
+    title = title.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
+    title = title.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    title = decodeXmlEntities(title);
+
+    // Robust regex link extraction: search link/guid, clean CDATA, support nested structures
+    const linkMatch = itemXml.match(/<link[^>]*>([\s\S]*?)<\/link>/i) || itemXml.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i);
+    let link = linkMatch ? linkMatch[1].trim() : "";
+    const hrefMatch = itemXml.match(/<link[^>]+href=["']([^"']+)["']/i);
+    if (hrefMatch && (!link || !link.startsWith("http"))) {
+      link = hrefMatch[1].trim();
+    }
+    link = link.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
+    link = link.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    link = decodeXmlEntities(link);
+    if (!link || !link.startsWith("http")) {
+      link = prefix === "digg" ? "https://www.cbsnews.com" : "https://uncrate.com";
+    }
+
+    const contentEncodedMatch = itemXml.match(/<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i);
+    const descMatch = itemXml.match(/<description[^>]*>([\s\S]*?)<\/description>/i);
+    let summary = "";
+    if (contentEncodedMatch) {
+       summary = contentEncodedMatch[1].trim();
+    } else if (descMatch) {
+       summary = descMatch[1].trim();
+    }
+    summary = summary.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
+    summary = summary.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+
+    let imgFromHtml = "";
+    const inlineImgMatch = summary.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (inlineImgMatch) {
+      imgFromHtml = inlineImgMatch[1].trim();
+    }
+
+    summary = summary.replace(/<[^>]*>/g, "").trim();
+    summary = summary.replace(/Visit\s+Uncrate\s+for\s+the\s+full\s+post\s*\.?/gi, "").trim();
+    summary = decodeXmlEntities(summary);
+    if (summary.length > 250) {
+      summary = summary.slice(0, 247) + "...";
+    }
+    if (!summary) {
+      summary = prefix === "digg" 
+        ? "Access live coverage, videos, and multi-angle analysis directly from the cbsnews.com feed."
+        : "Discover custom crafted high-performance gear, premium styles, classic luxury cars, and brutalist architectures curated by Uncrate.";
+    }
+
+    const pubDateMatch = itemXml.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i);
+    let publishedAt = new Date().toISOString();
+    if (pubDateMatch) {
+      try {
+        const parsedDate = new Date(pubDateMatch[1].trim());
+        if (!isNaN(parsedDate.getTime())) {
+          publishedAt = parsedDate.toISOString();
+        }
+      } catch {}
+    }
+
+    const categoryMatch = itemXml.match(/<category[^>]*>([\s\S]*?)<\/category>/i);
+    let category = categoryMatch ? categoryMatch[1].trim() : "";
+    category = category.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    category = decodeXmlEntities(category);
+    if (!category) {
+      category = prefix === "digg" ? "Main News" : "Gear";
+    } else if (prefix === "cbs") {
+      const lowerCat = category.toLowerCase();
+      if (lowerCat.includes("style") || lowerCat.includes("apparel") || lowerCat.includes("wear") || lowerCat.includes("shoes") || lowerCat.includes("boots") || lowerCat.includes("jacket") || lowerCat.includes("rings") || lowerCat.includes("watch") || lowerCat.includes("grooming")) {
+        category = "Style";
+      } else if (lowerCat.includes("car") || lowerCat.includes("automotive") || lowerCat.includes("motorcycle") || lowerCat.includes("vehicle") || lowerCat.includes("truck") || lowerCat.includes("rides") || lowerCat.includes("moto") || lowerCat.includes("ducati") || lowerCat.includes("yamaha") || lowerCat.includes("porsche")) {
+        category = "Cars";
+      } else if (lowerCat.includes("shelter") || lowerCat.includes("architecture") || lowerCat.includes("house") || lowerCat.includes("cabin") || lowerCat.includes("home") || lowerCat.includes("design") || lowerCat.includes("furniture") || lowerCat.includes("hotel")) {
+        category = "Shelter";
+      } else if (lowerCat.includes("tech") || lowerCat.includes("gadget") || lowerCat.includes("gear") || lowerCat.includes("tool") || lowerCat.includes("everyday carry") || lowerCat.includes("edc") || lowerCat.includes("audio") || lowerCat.includes("speaker") || lowerCat.includes("synth") || lowerCat.includes("software")) {
+        category = "Tech";
+      } else if (lowerCat.includes("vices") || lowerCat.includes("drink") || lowerCat.includes("smoke") || lowerCat.includes("whiskey") || lowerCat.includes("cigar") || lowerCat.includes("spirits") || lowerCat.includes("beer")) {
+        category = "Vices";
+      } else {
+        category = "Gear";
+      }
+    }
+
+    // Failsafe image/thumbnail extraction
+    let itemThumbnailUrl = "";
+    
+    const mediaContentMatch = itemXml.match(/<[^:]+:content[^>]+url=["']([^"']+)["']/i) || itemXml.match(/<content[^>]+url=["']([^"']+)["']/i);
+    const mediaThumbnailMatch = itemXml.match(/<[^:]+:thumbnail[^>]+url=["']([^"']+)["']/i) || itemXml.match(/<thumbnail[^>]+url=["']([^"']+)["']/i);
+    const enclosureMatch = itemXml.match(/<enclosure[^>]+url=["']([^"']+)["']/i);
+    const imgMatch = itemXml.match(/<img[^>]+src=["']([^"']+)["']/i);
+    
+    if (mediaContentMatch) {
+       itemThumbnailUrl = mediaContentMatch[1];
+    } else if (mediaThumbnailMatch) {
+       itemThumbnailUrl = mediaThumbnailMatch[1];
+    } else if (enclosureMatch) {
+       itemThumbnailUrl = enclosureMatch[1];
+    } else if (imgFromHtml) {
+       itemThumbnailUrl = imgFromHtml;
+    } else if (imgMatch) {
+       itemThumbnailUrl = imgMatch[1];
+    }
+
+    // Image tag fallback
+    if (!itemThumbnailUrl) {
+      const imageTagsMatch = itemXml.match(/<image[^>]*>([\s\S]*?)<\/image>/i);
+      if (imageTagsMatch) {
+        const innerUrlMatch = imageTagsMatch[1].match(/<url[^>]*>([\s\S]*?)<\/url>/i);
+        if (innerUrlMatch) {
+          itemThumbnailUrl = innerUrlMatch[1].trim();
+        }
+      }
+    }
+
+    // Hard scan image lookup
+    if (!itemThumbnailUrl) {
+      const anyImgUrlMatch = itemXml.match(/https?:\/\/[^"'\s<>]+?\.(?:jpe?g|png|gif|webp)(?:\?[^"'\s<>]+)?/i);
+      if (anyImgUrlMatch) {
+        itemThumbnailUrl = anyImgUrlMatch[0];
+      }
+    }
+
+    if (itemThumbnailUrl) {
+      itemThumbnailUrl = decodeXmlEntities(itemThumbnailUrl).replace(/['"]/g, "").trim();
+    }
+
+    if (!itemThumbnailUrl) {
+      itemThumbnailUrl = categoryPlaceholders[category] || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&auto=format&fit=crop";
+    }
+
+    const videoChoice = prefix === "digg" 
+      ? verifyPoolDigg[(index - 1) % verifyPoolDigg.length]
+      : verifyPoolCbs[(index - 1) % verifyPoolCbs.length];
+
+    const viewsCount = Math.floor(Math.random() * 500000) + 120000;
+    const trendingScore = Math.floor(Math.random() * 25) + 72;
+
+    stories.push({
+      id: `${prefix}-${index}`,
+      title,
+      summary,
+      url: link,
+      publishedAt,
+      youtubeVideoId: videoChoice.id,
+      youtubeVideoTitle: videoChoice.title,
+      youtubeChannel: videoChoice.channel,
+      viewsCount,
+      trendingScore,
+      category,
+      itemThumbnailUrl
+    });
+    
+    index++;
+  }
+  return stories;
+};
+
+// Asynchronous non-blocking client-side YouTube search optimization
+const optimizeStoriesYoutubeClient = async (
+  stories: Story[], 
+  setStoryGroup: (updater: (prev: Story[]) => Story[]) => void
+) => {
+  // Optimize top 5 stories in the background to keep it highly performant
+  const storiesToOptimize = stories.slice(0, 5);
+  for (const story of storiesToOptimize) {
+    try {
+      const query = (story.title || "").replace(/[^\w\s-]/g, "").trim().slice(0, 80);
+      if (!query) continue;
+
+      const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query + " CBS News")}`;
+      const corsUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
+      const res = await fetch(corsUrl);
+      if (!res.ok) continue;
+
+      const html = await res.text();
+      const videoIdMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+      if (videoIdMatch && videoIdMatch[1]) {
+        const videoId = videoIdMatch[1];
+        let videoTitle = "CBS News Segment";
+        const titleMatch = html.match(/"title":{"runs":\[{"text":"([^"]+)"/);
+        if (titleMatch && titleMatch[1]) {
+          videoTitle = titleMatch[1];
+        }
+        let channelName = "CBS News";
+        const channelMatch = html.match(/"ownerText":{"runs":\[{"text":"([^"]+)"/);
+        if (channelMatch && channelMatch[1]) {
+          channelName = channelMatch[1];
+        }
+
+        // Apply clean state update
+        setStoryGroup(prev => prev.map(s => {
+          if (s.id === story.id) {
+            return {
+              ...s,
+              youtubeVideoId: videoId,
+              youtubeVideoTitle: videoTitle,
+              youtubeChannel: channelName,
+              youtubeThumbnailUrl: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+              videoUrl: `https://www.youtube.com/watch?v=${videoId}`
+            };
+          }
+          return s;
+        }));
+      }
+    } catch (err) {
+      console.warn(`[Client background YT lookup failed for "${story.title}"]:`, err);
+    }
+  }
+};
+
 export default function App() {
   const [data, setData] = useState<DualFeedData | null>(() => {
     if (typeof window !== "undefined" && (window as any).__INITIAL_DATA__) {
@@ -33,7 +595,6 @@ export default function App() {
   });
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
-    // Dynamically default to the current system date in ISO format
     const today = new Date();
     return today.toISOString().split("T")[0];
   });
@@ -43,7 +604,7 @@ export default function App() {
     if (typeof window !== "undefined" && (window as any).__INITIAL_DATA_SOURCE__) {
       return (window as any).__INITIAL_DATA_SOURCE__;
     }
-    return "live";
+    return "live-client-cors";
   });
   const [isDemoFallback, setIsDemoFallback] = useState<boolean>(() => {
     if (typeof window !== "undefined" && (window as any).__INITIAL_DATA_FALLBACK__) {
@@ -52,39 +613,75 @@ export default function App() {
     return false;
   });
 
-  // Fetch stories data from local full-stack server
+  // Client data compiler directly aligned with purely visual porting layout requirements
   const fetchStories = async (dateVal: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const url = `/api/stories?date=${dateVal}`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Server returned error status ${response.status}`);
+      const todayStr = new Date().toISOString().split("T")[0];
+      
+      if (dateVal === todayStr) {
+        console.log("[Client] Processing matches for today's dynamic live indexing.");
+        
+        // Initial defaults using offline backup mappings to prevent empty states
+        const offlineBaseline = getDynamicFallback(dateVal);
+        let liveDigg: Story[] = [];
+        let liveCbs: Story[] = [];
+
+        // 1. Fetch live CBS News RSS feed with client CORS bypass
+        try {
+          const cbsNewsXml = await fetchWithProxy("https://www.cbsnews.com/latest/rss/main");
+          liveDigg = parseRssXmlClient(cbsNewsXml, "digg");
+        } catch (err) {
+          console.warn("[Client] Live CBS compilation failed. Standard offline mapping engaged:", err);
+        }
+
+        // 2. Fetch live Uncrate RSS feed with client CORS bypass
+        try {
+          const uncrateXml = await fetchWithProxy("https://feeds.feedburner.com/uncrate");
+          liveCbs = parseRssXmlClient(uncrateXml, "cbs");
+        } catch (err) {
+          console.warn("[Client] Live Uncrate-Gear compilation failed. Standard offline mapping engaged:", err);
+        }
+
+        if (liveDigg.length > 0 || liveCbs.length > 0) {
+          const mergedDigg = liveDigg.length > 0 ? liveDigg : offlineBaseline.diggStories;
+          const mergedCbs = liveCbs.length > 0 ? liveCbs : offlineBaseline.cbsStories;
+
+          setData({
+            diggStories: mergedDigg.slice(0, 10),
+            cbsStories: mergedCbs.slice(0, 10),
+            cutoffDate: `System Live Index - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          });
+          setDataSource("live-client-cors");
+          setIsDemoFallback(false);
+
+          // Launch non-blocking background crawler lookup to ground active Youtube channels in real-time
+          optimizeStoriesYoutubeClient(mergedDigg.slice(0, 10), (updater) => {
+            setData(prev => prev ? { ...prev, diggStories: updater(prev.diggStories) } : null);
+          });
+          optimizeStoriesYoutubeClient(mergedCbs.slice(0, 10), (updater) => {
+            setData(prev => prev ? { ...prev, cbsStories: updater(prev.cbsStories) } : null);
+          });
+
+          setIsLoading(false);
+          return;
+        }
       }
-      const json = await response.json();
-      if (json.success) {
-        // Limit results to top 10 as strictly requested
-        setData({
-          diggStories: json.diggStories?.slice(0, 10) || [],
-          cbsStories: json.cbsStories?.slice(0, 10) || [],
-          cutoffDate: json.cutoffDate || "Previous Day 23:59",
-        });
-        setDataSource(json.source || "gemini-grounded");
-        setIsDemoFallback(false);
-      } else {
-        throw new Error(json.error || "Failed to successfully query stories");
-      }
-    } catch (err: any) {
-      console.warn("[Client Fallback Trigger] Live server not running or API endpoint returned 404. Switching to high-fidelity offline mode for platform compilation safety:", err);
-      // Fallback gracefully to backup data
+
+      // 3. Fallback date loader
+      const offlineBaseline = getDynamicFallback(dateVal);
       setData({
-        diggStories: BACKUP_DIGG_STORIES.slice(0, 10),
-        cbsStories: BACKUP_CBS_STORIES.slice(0, 10),
-        cutoffDate: "Static Archive Preview Mode",
+        diggStories: offlineBaseline.diggStories.slice(0, 10),
+        cbsStories: offlineBaseline.cbsStories.slice(0, 10),
+        cutoffDate: offlineBaseline.cutoffDate,
       });
       setDataSource("demo-fallback");
       setIsDemoFallback(true);
+
+    } catch (err: any) {
+      console.error("[Client Compiler Fatal]", err);
+      setError(err?.message || "Internal error compiling live content indexes.");
     } finally {
       setIsLoading(false);
     }

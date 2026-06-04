@@ -217,11 +217,19 @@ async function startServer() {
       title = title.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
       title = decodeXmlEntities(title);
 
-      // Extract link
+      // Extract link: check XML tags, handle CDATA, check href attribute and falls back safely
       const linkMatch = itemXml.match(/<link[^>]*>([\s\S]*?)<\/link>/i) || itemXml.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i);
-      let link = linkMatch ? linkMatch[1].trim() : "https://www.cbsnews.com";
+      let link = linkMatch ? linkMatch[1].trim() : "";
+      const hrefMatch = itemXml.match(/<link[^>]+href=["']([^"']+)["']/i);
+      if (hrefMatch && (!link || !link.startsWith("http"))) {
+        link = hrefMatch[1].trim();
+      }
+      link = link.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/gi, "$1").trim();
       link = link.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
       link = decodeXmlEntities(link);
+      if (!link || !link.startsWith("http")) {
+        link = prefix === "digg" ? "https://www.cbsnews.com" : "https://uncrate.com";
+      }
 
       // Extract description
       const contentEncodedMatch = itemXml.match(/<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i);
